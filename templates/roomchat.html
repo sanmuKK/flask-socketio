@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Room</title>
+    <script src="//code.jquery.com/jquery-1.12.4.min.js" integrity="sha256-ZosEbRLbNQzLpnKIkEdrPv7lOy9C27hHQ+Xp8a4MxAQ=" crossorigin="anonymous"></script>
+    <script src="//cdnjs.cloudflare.com/ajax/libs/socket.io/2.2.0/socket.io.js" integrity="sha256-yr4fRk/GU1ehYJPAs8P4JlTgu0Hdsp4ZKrx8bDEDC3I=" crossorigin="anonymous"></script>
+    <script type="text/javascript" charset="utf-8">
+    $(document).ready(function() {
+        var socket = io();
+        socket.on('connect', function() {
+                socket.emit('my_event', {data: 'I\'m connected!'});
+                socket.emit('join');
+            });
+        socket.on('roomchat', function (msg, cb) {
+            $('#log').append('<br>' + $('<div/>').text( msg.name+': ' + msg.data).html());
+            if (cb)
+                cb();
+            });
+        socket.on('welcome', function (msg, cb) {
+            $('#log').append('<br>' + $('<div/>').text('欢迎"'+msg.name+'"进入了房间:'+msg.room).html());
+            if (cb)
+                cb();
+            });
+        $('form#change_name').submit(function (event) {
+             socket.emit('changenamee',{data:$('#changenames').val()});
+             return false;
+        });
+        $('form#roomchat').submit(function (event) {
+             socket.emit('my_room_event',{data:$('#room_chatdata').val()});
+             return false;
+        });
+    });
+</script>
+</head>
+<body>
+    <h1>Flask-SocketIO Test</h1>
+    <h2>Send:</h2>
+    {{room}}
+    <form id="change_name" method="POST" action='#'>
+        <input type="text" name="changenames" id="changenames" placeholder="修改名称" value={{name}}>
+        <input type="submit" value="修改名称">
+    </form>
+    <form id="roomchat" method="post" action="#">
+        <input type="text" name="room_chatdata" id="room_chatdata" placeholder="您要发送的消息">
+        <input type="submit" value="发送到此房间">
+    </form>
+    <!--
+    <form id="broadcast" method="POST" action='#'>
+        <input type="text" name="broadcast_data" id="broadcast_data" placeholder="Message">
+        <input type="submit" value="Broadcast">
+    </form>
+    <form id="join" method="POST" action='#'>
+        <input type="text" name="join_room" id="join_room" placeholder="Room Name">
+        <input type="submit" value="Join Room">
+    </form>
+    <form id="leave" method="POST" action='#'>
+        <input type="text" name="leave_room" id="leave_room" placeholder="Room Name">
+        <input type="submit" value="Leave Room">
+    </form>
+    <form id="send_room" method="POST" action='#'>
+        <input type="text" name="room_name" id="room_name" placeholder="Room Name">
+        <input type="text" name="room_data" id="room_data" placeholder="Message">
+        <input type="submit" value="Send to Room">
+    </form>
+    <form id="close" method="POST" action="#">
+        <input type="text" name="close_room" id="close_room" placeholder="Room Name">
+        <input type="submit" value="Close Room">
+    </form>
+    <form id="disconnect" method="POST" action="#">
+        <input type="submit" value="Disconnect">
+    </form>
+-->
+    <h2>Receive:</h2>
+    {{room}}
+    <div id="log"></div>
+</body>
+</html>
