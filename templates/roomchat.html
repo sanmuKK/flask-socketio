@@ -9,7 +9,6 @@
     $(document).ready(function() {
         var socket = io();
         socket.on('connect', function() {
-                socket.emit('my_event', {data: 'I\'m connected!'});
                 socket.emit('join');
             });
         socket.on('roomchat', function (msg, cb) {
@@ -22,6 +21,19 @@
             if (cb)
                 cb();
             });
+        socket.on('leaveroom', function (msg, cb) {
+            $('#log').append('<br>' + $('<div/>').text(msg.name+'"离开了房间:'+msg.room).html());
+            if (cb)
+                cb();
+            });
+        socket.on('close_room', function (msg, cb) {
+            $('#log').append('<br>' + $('<div/>').text('房间“'+msg.room+"”已关闭").html());
+            if (cb)
+                cb();
+            });
+        socket.on('people_num', function(msg) {
+                $('#peoplenum').text(msg);
+            });
         $('form#change_name').submit(function (event) {
              socket.emit('changenamee',{data:$('#changenames').val()});
              return false;
@@ -30,13 +42,27 @@
              socket.emit('my_room_event',{data:$('#room_chatdata').val()});
              return false;
         });
+        $('form#closingroom').submit(function (event) {
+             socket.emit('close_room');
+             return false;
+        });
+        $('form#changeroomname').submit(function (event) {
+             socket.emit('changeroomnamee',{room:$('#change_room_name').val()});
+             return false;
+        });
+        $('form#leaveroom').submit(function (event) {
+             socket.emit('leave');
+             return false;
+        });
     });
 </script>
 </head>
 <body>
     <h1>Flask-SocketIO Test</h1>
+    <p>Async mode is: <b>{{ async_mode }}</b></p>
     <h2>Send:</h2>
     {{room}}
+    <span id="peoplenum"></span>
     <form id="change_name" method="POST" action='#'>
         <input type="text" name="changenames" id="changenames" placeholder="修改名称" value={{name}}>
         <input type="submit" value="修改名称">
@@ -45,34 +71,22 @@
         <input type="text" name="room_chatdata" id="room_chatdata" placeholder="您要发送的消息">
         <input type="submit" value="发送到此房间">
     </form>
-    <!--
-    <form id="broadcast" method="POST" action='#'>
-        <input type="text" name="broadcast_data" id="broadcast_data" placeholder="Message">
-        <input type="submit" value="Broadcast">
+    <form id="leaveroom" method="post" action="#">
+        <input type="submit" value="离开此房间">
     </form>
-    <form id="join" method="POST" action='#'>
-        <input type="text" name="join_room" id="join_room" placeholder="Room Name">
-        <input type="submit" value="Join Room">
+    {% if master == room %}
+    <form id="closingroom" method="post" action="#">
+        <input type="submit" value="关闭房间">
     </form>
-    <form id="leave" method="POST" action='#'>
-        <input type="text" name="leave_room" id="leave_room" placeholder="Room Name">
-        <input type="submit" value="Leave Room">
-    </form>
-    <form id="send_room" method="POST" action='#'>
-        <input type="text" name="room_name" id="room_name" placeholder="Room Name">
-        <input type="text" name="room_data" id="room_data" placeholder="Message">
-        <input type="submit" value="Send to Room">
-    </form>
-    <form id="close" method="POST" action="#">
-        <input type="text" name="close_room" id="close_room" placeholder="Room Name">
-        <input type="submit" value="Close Room">
-    </form>
-    <form id="disconnect" method="POST" action="#">
-        <input type="submit" value="Disconnect">
-    </form>
--->
+    {% endif %}
     <h2>Receive:</h2>
-    {{room}}
+    {% for i in resp.data %}
+    {% if i.name %}
+    {{i.name}}:{{i.data}}<br>
+    {% else %}
+    {{i.data}}<br>
+    {% endif %}
+    {% endfor %}
     <div id="log"></div>
 </body>
 </html>

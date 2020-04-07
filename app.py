@@ -1,6 +1,8 @@
 from flask import Flask, render_template, session, request,copy_current_request_context,redirect,url_for
 from flask_socketio import SocketIO, emit, join_room, leave_room,close_room, rooms, disconnect
-import random
+from flask_redis import FlaskRedis
+import random,json
+
 
 def ack():
     print('message was received!')
@@ -18,46 +20,118 @@ num=["大熊猫","白鳍豚","扬子鳄","白唇鹿","藏野驴","黑颈鹤","�
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
+app.config["REDIS_URL"] = "redis://127.0.0.1:6379/0"
 socketio = SocketIO(app)
+rd = FlaskRedis(app)
+rd.flushall()
 
 
-@app.route('/',methods=['GET','POST'])
-def index():
-    if request.method == 'POST':
-        room=request.form.get('join_room_url')
-        return redirect(url_for('join_room_url',room=room))
-    return render_template('home.html',async_mode=socketio.async_mode)
-
-
-@app.route('/room/<room>')
-def join_room_url(room):
+@app.route('/')
+def join_room_url():
+    room = request.args.get('room')
+    print(session)
+    print('start')
+    if not room:
+        return "请输入带房间名的url,如?room=房间一号"
+    try:
+        session['room']
+        session['name']
+    except:
+        a = random.randint(0, len(adj) - 1)
+        b = random.randint(0, len(num) - 1)
+        name = adj[a] + "的" + num[b]
+        session['name'] = name
+    else:
+        if session['room'] == room:
+            name = session['name']
+        else:
+            a = random.randint(0, len(adj) - 1)
+            b = random.randint(0, len(num) - 1)
+            name = adj[a] + "的" + num[b]
+            session['name'] = name
     session['room'] = room
-    a = random.randint(0, len(adj)-1)
-    b = random.randint(0, len(num)-1)
-    name = adj[a] + "的" + num[b]
-    session['name'] = name
-    return render_template('roomchat.html',room=room,name=name)
+    session['master'] = session.get('master', '')
+    if not rd.exists(room):
+        session['master'] = room
+    elif room==session['master']:
+        pass
+    else:
+        session['master'] = ''
+    key = room
+    if rd.llen(key):
+        msgs = rd.lrange(key, 0, -1)
+        res = {
+            "data": [json.loads(v) for v in msgs]
+        }
+    else:
+        res = {
+            "data": []
+        }
+    return render_template('roomchat.html',room=room,name=name,resp=res,master=session['master'],
+                           async_mode=socketio.async_mode)
 
 
 @socketio.on('join')
 def on_join():
     room = session['room']
     join_room(room)
-    emit('welcome', {'name': session['name'], 'room': session['room']}, room=session['room'])
+    key = session['room']
+    task = {'data' : '欢迎"'+session['name']+'"进入了房间:'+session['room']}
+    resp = json.dumps(task)
+    rd.rpush(key,resp)
+    print(room)
+    emit('welcome', {'name': session['name'], 'room': room}, room=room)
 
 @socketio.on('leave')
-def on_leave(data):
-    pass
+def leave():
+    session['name'] = session.get('name', '')
+    session['room'] = session.get('room', '')
+    session['master'] = session.get('master', '')
+    emit('leaveroom', {'name': session['name'], 'room': session['room']}, room=session['room'])
+    if(session['master'] == session['room']):
+        emit('close_room', {'room': session['room']}, room=session['room'])
+        close_room(session['room'])
+        rd.delete(session['room'])
+    else:
+        key = session['room']
+        task = {'data': session['name'] + '"离开了房间:' + session['room']}
+        resp = json.dumps(task)
+        rd.rpush(key, resp)
+        leave_room(session['room'])
+    session.clear()
 
 @socketio.on('my_room_event')
 def room_chat(data):
+    session['name'] = session.get('name', '')
+    session['room'] = session.get('room','')
+    key = session['room']
+    task = {
+        'name' : session['name'],
+        'data' : data['data']
+    }
+    resp = json.dumps(task)
+    rd.rpush(key, resp)
+    print(session)
+    print('here')
     emit('roomchat',{'data':data['data'],'name':session['name']},room=session['room'])
 
 @socketio.on('changenamee')
 def change_name(data):
-    session['name'] = data['data']
-    print(session)
-    emit('welcome', {'name': data['data'],'room':session['room']},room=session['room'])
+    session['room'] = session.get('room', '')
+    session['name'] = session.get('name', '')
+    if session['name'] != data['data']:
+        session['name'] = data['data']
+        emit('welcome', {'name': data['data'],'room':session['room']},room=session['room'])
+
+@socketio.on('close_room')
+def close():
+    session['room'] = session.get('room','')
+    session['master'] = session.get('master', '')
+    if session['master'] == session['room']:
+        emit('close_room', {'room':session['room']}, room=session['room'])
+        close_room(session['room'])
+        rd.delete(session['room'])
+        session.clear()
 
 @socketio.on('disconnect')
 def test_disconnect():
