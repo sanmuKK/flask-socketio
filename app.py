@@ -1,11 +1,16 @@
-from flask import Flask, render_template, session, request,copy_current_request_context,redirect,url_for
+from flask import Flask, render_template, session, request,copy_current_request_context,redirect,url_for,send_from_directory
 from flask_socketio import SocketIO, emit, join_room, leave_room,close_room, rooms, disconnect
 from flask_redis import FlaskRedis
-import random,json
+import random,json,os
+from flask_sqlalchemy import SQLAlchemy
+import pymysql
+pymysql.install_as_MySQLdb()
 
 
-def ack():
-    print('message was received!')
+def query_room(roomname):
+    room = Room.query.filter(Room.id == roomname).first()
+    if room:
+        return room
 
 adj=["浪漫","灵巧","动人","开放","稳健","稳重","外向","热心","坦白","英勇"
     ,"典雅","乐观","勇敢","正直","坚毅","幽默","强干","生动","坦诚","积极"
@@ -21,16 +26,33 @@ num=["大熊猫","白鳍豚","扬子鳄","白唇鹿","藏野驴","黑颈鹤","�
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
 app.config["REDIS_URL"] = "redis://127.0.0.1:6379/0"
+app.config["SQLALCHEMY_DATABASE_URI"]='mysql://root:l.1322630122@localhost:3306/first_flask?charset=utf8'
+app.config["SQLALCHEMY_TRACK_MODIFICATIONS"]='False'
+db=SQLAlchemy(app)
 socketio = SocketIO(app)
 rd = FlaskRedis(app)
 rd.flushall()
 
+
+class Room(db.Model):
+    __tablename__='room'
+    id=db.Column(db.String(128),primary_key=True)
+    name=db.Column(db.String(128))
+    image=db.Column(db.String(128))
+    introduction=db.Column(db.String(256))
+    count=db.Column(db.Integer)
+    def __repr__(self):
+        return '<Thumb_up %r>'%self.id
+
+db.drop_all()
+db.create_all()
 
 @app.route('/')
 def join_room_url():
     room = request.args.get('room')
     print(session)
     print('start')
+    icon = '/static/56172956.jpeg'
     if not room:
         return "请输入带房间名的url,如?room=房间一号"
     try:
@@ -51,8 +73,11 @@ def join_room_url():
             session['name'] = name
     session['room'] = room
     session['master'] = session.get('master', '')
-    if not rd.exists(room):
+    if not query_room(room):
         session['master'] = room
+        ro = Room(id=room,name=room,count=0,introduction='无',image=icon)
+        db.session.add(ro)
+        db.session.commit()
     elif room==session['master']:
         pass
     else:
@@ -67,9 +92,32 @@ def join_room_url():
         res = {
             "data": []
         }
+    r=query_room(room)
     return render_template('roomchat.html',room=room,name=name,resp=res,master=session['master'],
-                           async_mode=socketio.async_mode)
+                           async_mode=socketio.async_mode,r=r)
 
+
+@app.route('/changeroom',methods=['GET','POST'])
+def changeroom():
+    room = request.args.get('room')
+    r=query_room(room)
+    print(r.introduction)
+    if request.method == 'POST':
+        name=request.form.get('room_name')
+        introduction=request.form.get('room_introduction')
+        file = request.files['file']
+        path=r'.\static'
+        if file:
+            file.save(os.path.join(path,file.filename))
+            icon = '/static/'+file.filename
+            r.image = icon
+        if introduction:
+            r.introduction=introduction
+        if name:
+            r.name=name
+        db.session.commit()
+        return redirect(url_for('join_room_url',room=room))
+    return render_template('changeroom.html')
 
 @socketio.on('join')
 def on_join():
@@ -80,6 +128,16 @@ def on_join():
     resp = json.dumps(task)
     rd.rpush(key,resp)
     print(room)
+    icon = '/static/56172956.jpeg'
+    if not query_room(room):
+        session['master'] = room
+        ro = Room(id=room,name=room,count=0,introduction='无',image=icon)
+        db.session.add(ro)
+        db.session.commit()
+    r=query_room(room)
+    r.count+=1
+    emit('people_num',r.count)
+    db.session.commit()
     emit('welcome', {'name': session['name'], 'room': room}, room=room)
 
 @socketio.on('leave')
@@ -130,8 +188,13 @@ def close():
     if session['master'] == session['room']:
         emit('close_room', {'room':session['room']}, room=session['room'])
         close_room(session['room'])
+        r=query_room(session['room'])
+        db.session.delete(r)
+        db.session.commit()
         rd.delete(session['room'])
         session.clear()
+        print(session)
+        print('end')
 
 @socketio.on('disconnect')
 def test_disconnect():

@@ -60,9 +60,11 @@
 <body>
     <h1>Flask-SocketIO Test</h1>
     <p>Async mode is: <b>{{ async_mode }}</b></p>
-    <h2>Send:</h2>
-    {{room}}
     <span id="peoplenum"></span>
+    <h2>Send:</h2>
+    <img    src="{{r.image}}" height="128" width="128" ><br>
+    房间名：{{r.name}}<br>
+    房间详情：{{r.introduction}}<br>
     <form id="change_name" method="POST" action='#'>
         <input type="text" name="changenames" id="changenames" placeholder="修改名称" value={{name}}>
         <input type="submit" value="修改名称">
@@ -78,6 +80,7 @@
     <form id="closingroom" method="post" action="#">
         <input type="submit" value="关闭房间">
     </form>
+    <a href="{{ url_for('changeroom',room=room) }}">修改房间信息</a><br>
     {% endif %}
     <h2>Receive:</h2>
     {% for i in resp.data %}
