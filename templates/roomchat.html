@@ -9,7 +9,6 @@
     $(document).ready(function() {
         var socket = io();
         socket.on('connect', function() {
-                socket.emit('join');
             });
         socket.on('roomchat', function (msg, cb) {
             $('#log').append('<br>' + $('<div/>').text( msg.name+': ' + msg.data).html());
@@ -31,9 +30,16 @@
             if (cb)
                 cb();
             });
-        socket.on('people_num', function(msg) {
-                $('#peoplenum').text(msg);
+        socket.on('people_num', function(msg,cb) {
+            $('#peoplenum').empty()
+            $('#peoplenum').append($('<span/>').text(msg).html());
+            if (cb)
+                cb();
             });
+        $().ready(function (event) {
+             socket.emit('join');
+             return false;
+        });
         $('form#change_name').submit(function (event) {
              socket.emit('changenamee',{data:$('#changenames').val()});
              return false;
@@ -60,7 +66,7 @@
 <body>
     <h1>Flask-SocketIO Test</h1>
     <p>Async mode is: <b>{{ async_mode }}</b></p>
-    <span id="peoplenum"></span>
+    当前在线人数：<span id="peoplenum"></span>
     <h2>Send:</h2>
     <img    src="{{r.image}}" height="128" width="128" ><br>
     房间名：{{r.name}}<br>
