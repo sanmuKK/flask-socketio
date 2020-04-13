@@ -32,7 +32,7 @@ class Room(db.Model):
     introduction=db.Column(db.String(256))
     count=db.Column(db.Integer)
     def __repr__(self):
-        return '<Thumb_up %r>'%self.id
+        return '<Room %r>'%self.id
 
 db.drop_all()
 db.create_all()
@@ -71,10 +71,8 @@ def creatnewroom():
 @app.route('/')
 def join_room_url():
     room = request.args.get('room')
-    print(session)
-    print('start')
     if not room:
-        return "请输入带房间名的url加入房间,如?room=房间一号,或通过访问/creatnewroom来创建一个属于你的新房间"
+        return "请输入带房间名的url加入房间,如?room=房间号,或通过访问/creatnewroom来创建一个属于你的新房间"
     if not query_room(room):
         abort(404)
     try:
@@ -107,7 +105,6 @@ def join_room_url():
 def changeroom():
     room = request.args.get('room')
     r=query_room(room)
-    print(r.introduction)
     if request.method == 'POST':
         name=request.form.get('room_name')
         introduction=request.form.get('room_introduction')
@@ -130,23 +127,21 @@ def on_join():
     room = session['room']
     join_room(room)
     key = session['room']
-    task = {'data' : '欢迎"'+session['name']+'"进入了房间:'+session['room']}
+    task = {'data' : '欢迎"'+session['name']+'"进入了房间'}
     resp = json.dumps(task)
     rd.rpush(key,resp)
-    print(session)
-    print('join')
     r=query_room(room)
     r.count+=1
     db.session.commit()
     emit('people_num',r.count,room=room)
-    emit('welcome', {'name': session['name'], 'room': room}, room=room)
+    emit('welcome', {'name': session['name']}, room=room)
 
 @socketio.on('leave')
 def leave():
     session['name'] = session.get('name', '')
     session['room'] = session.get('room', '')
     session['master'] = session.get('master', '')
-    emit('leaveroom', {'name': session['name'], 'room': session['room']}, room=session['room'])
+    emit('leaveroom', {'name': session['name']}, room=session['room'])
     if(session['master'] == session['room']):
         emit('close_room', {'room': session['room']}, room=session['room'])
         close_room(session['room'])
@@ -159,7 +154,7 @@ def leave():
         session['master'] = ''
     else:
         key = session['room']
-        task = {'data': session['name'] + '"离开了房间:' + session['room']}
+        task = {'data': session['name'] + '"离开了房间'}
         resp = json.dumps(task)
         rd.rpush(key, resp)
         r = query_room(session['room'])
@@ -180,8 +175,6 @@ def room_chat(data):
     }
     resp = json.dumps(task)
     rd.rpush(key, resp)
-    print(session)
-    print('here')
     emit('roomchat',{'data':data['data'],'name':session['name']},room=session['room'])
 
 @socketio.on('changenamee')
@@ -189,8 +182,9 @@ def change_name(data):
     session['room'] = session.get('room', '')
     session['name'] = session.get('name', '')
     if session['name'] != data['data']:
+        emit('leaveroom', {'name': session['name']}, room=session['room'])
         session['name'] = data['data']
-        emit('welcome', {'name': data['data'],'room':session['room']},room=session['room'])
+        emit('welcome', {'name': data['data']},room=session['room'])
 
 @socketio.on('close_room')
 def close():
@@ -210,14 +204,13 @@ def close():
 @socketio.on('disconnect')
 def test_disconnect():
     session['ifleave']=session.get('ifleave','no')
-    print(session)
     if session['ifleave'] == 'no':
         r=query_room(session['room'])
-        r.count-=1
-        db.session.commit()
-        emit('leaveroom', {'name': session['name'], 'room': session['room']}, room=session['room'])
-        emit('people_num', r.count,room=session['room'])
-    print('Client disconnected')
+        if r:
+            r.count-=1
+            db.session.commit()
+            emit('leaveroom', {'name': session['name']}, room=session['room'])
+            emit('people_num', r.count,room=session['room'])
 
 if __name__ == '__main__':
     socketio.run(app,debug=True)

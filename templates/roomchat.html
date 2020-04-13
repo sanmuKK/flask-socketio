@@ -16,17 +16,17 @@
                 cb();
             });
         socket.on('welcome', function (msg, cb) {
-            $('#log').append('<br>' + $('<div/>').text('欢迎"'+msg.name+'"进入了房间:'+msg.room).html());
+            $('#log').append('<br>' + $('<div/>').text('欢迎"'+msg.name+'"进入了房间').html());
             if (cb)
                 cb();
             });
         socket.on('leaveroom', function (msg, cb) {
-            $('#log').append('<br>' + $('<div/>').text(msg.name+'"离开了房间:'+msg.room).html());
+            $('#log').append('<br>' + $('<div/>').text(msg.name+'"离开了房间').html());
             if (cb)
                 cb();
             });
         socket.on('close_room', function (msg, cb) {
-            $('#log').append('<br>' + $('<div/>').text('房间“'+msg.room+"”已关闭").html());
+            $('#log').append('<br>' + $('<div/>').text("房间已关闭").html());
             if (cb)
                 cb();
             });
@@ -50,10 +50,6 @@
         });
         $('form#closingroom').submit(function (event) {
              socket.emit('close_room');
-             return false;
-        });
-        $('form#changeroomname').submit(function (event) {
-             socket.emit('changeroomnamee',{room:$('#change_room_name').val()});
              return false;
         });
         $('form#leaveroom').submit(function (event) {
