@@ -1,5 +1,5 @@
 from flask import Flask, render_template, session, request,copy_current_request_context,redirect,\
-    flash,url_for,send_from_directory
+    flash,url_for,send_from_directory,abort
 from flask_socketio import SocketIO, emit, join_room, leave_room,close_room, rooms, disconnect
 from flask_redis import FlaskRedis
 import random,json,os,uuid
@@ -26,8 +26,7 @@ rd.flushall()
 
 class Room(db.Model):
     __tablename__='room'
-    fakeid=db.Column(db.String(128),primary_key=True)
-    id=db.Column(db.String(128))
+    id=db.Column(db.String(128),primary_key=True)
     name=db.Column(db.String(128))
     image=db.Column(db.String(128))
     introduction=db.Column(db.String(256))
@@ -44,31 +43,30 @@ def makename():
     if request.method=='POST':
         room = request.args.get('room')
         name = request.form.get('name')
-        icon = '/static/56172956.jpeg'
         session['master'] = session.get('master', '')
         session['room'] = session.get('room', '')
-        if not query_room(room):
-            session['master'] = room
-            ro = Room(fakeid=uuid.uuid4().hex, id=room, name=room, count=0, introduction='无', image=icon)
-            db.session.add(ro)
-            db.session.commit()
-        elif room == session['master']:
-            pass
-        else:
-            session['master'] = ''
         if(name == ''):
             flash('匿名名称不能为空')
             return  redirect(url_for('makename',room=room))
         else:
             session['name'] = name
-            r = query_room(room)
-            if session['room']!=room:
-                r.count+=1
-                db.session.commit()
-                session['room']=room
+            session['room']=room
         return redirect(url_for('join_room_url',room=room))
     return render_template('makename.html',room=room)
 
+
+@app.route('/creatnewroom')
+def creatnewroom():
+    icon = '/static/56172956.jpeg'
+    room=uuid.uuid4().hex
+    if not query_room(room):
+        session['master'] = room
+        ro = Room(id=room, name='暂无', count=0, introduction='无', image=icon)
+        db.session.add(ro)
+        db.session.commit()
+        return redirect(url_for('join_room_url',room=room))
+    else:
+        return redirect(url_for('creatnewroom'))
 
 @app.route('/')
 def join_room_url():
@@ -76,7 +74,9 @@ def join_room_url():
     print(session)
     print('start')
     if not room:
-        return "请输入带房间名的url,如?room=房间一号"
+        return "请输入带房间名的url加入房间,如?room=房间一号,或通过访问/creatnewroom来创建一个属于你的新房间"
+    if not query_room(room):
+        abort(404)
     try:
         session['room']
         session['name']
@@ -88,18 +88,6 @@ def join_room_url():
             session['room'] = room
         else:
             return redirect(url_for('makename', room=room))
-    icon = '/static/56172956.jpeg'
-    session['master'] = session.get('master', '')
-    session['room'] = session.get('room', '')
-    if not query_room(room):
-        session['master'] = room
-        ro = Room(fakeid=uuid.uuid4().hex, id=room, name=room, count=1, introduction='无', image=icon)
-        db.session.add(ro)
-        db.session.commit()
-    elif room == session['master']:
-        pass
-    else:
-        session['master'] = ''
     key = room
     if rd.llen(key):
         msgs = rd.lrange(key, 0, -1)
@@ -145,14 +133,11 @@ def on_join():
     task = {'data' : '欢迎"'+session['name']+'"进入了房间:'+session['room']}
     resp = json.dumps(task)
     rd.rpush(key,resp)
-    print(room)
-    icon = '/static/56172956.jpeg'
-    if not query_room(room):
-        session['master'] = room
-        ro = Room(fakeid=uuid.uuid4().hex,id=room,name=room,count=1,introduction='无',image=icon)
-        db.session.add(ro)
-        db.session.commit()
+    print(session)
+    print('join')
     r=query_room(room)
+    r.count+=1
+    db.session.commit()
     emit('people_num',r.count,room=room)
     emit('welcome', {'name': session['name'], 'room': room}, room=room)
 
@@ -166,6 +151,12 @@ def leave():
         emit('close_room', {'room': session['room']}, room=session['room'])
         close_room(session['room'])
         rd.delete(session['room'])
+        r = query_room(session['room'])
+        db.session.delete(r)
+        db.session.commit()
+        session['room'] = ''
+        session['name'] = ''
+        session['master'] = ''
     else:
         key = session['room']
         task = {'data': session['name'] + '"离开了房间:' + session['room']}
@@ -176,9 +167,7 @@ def leave():
         emit('people_num', r.count, room=session['room'])
         db.session.commit()
         leave_room(session['room'])
-    session['room']=''
-    session['name'] = ''
-    session['master'] = ''
+    session['ifleave'] = 'yes'
 
 @socketio.on('my_room_event')
 def room_chat(data):
@@ -218,13 +207,16 @@ def close():
         session['name'] = ''
         session['master'] = ''
 
-@socketio.on('peoplenum')
-def people_num():
-    r = query_room(session['room'])
-    emit('people_num', r.count)
-
 @socketio.on('disconnect')
 def test_disconnect():
+    session['ifleave']=session.get('ifleave','no')
+    print(session)
+    if session['ifleave'] == 'no':
+        r=query_room(session['room'])
+        r.count-=1
+        db.session.commit()
+        emit('leaveroom', {'name': session['name'], 'room': session['room']}, room=session['room'])
+        emit('people_num', r.count,room=session['room'])
     print('Client disconnected')
 
 if __name__ == '__main__':
