@@ -42,7 +42,7 @@ def makename():
     room = request.args.get('room')
     if request.method=='POST':
         room = request.args.get('room')
-        name = request.form.get('name')
+        name = request.json.get('name','')
         session['icon'] = session.get('icon', '')
         session['master'] = session.get('master', '')
         session['room'] = session.get('room', '')
@@ -61,7 +61,7 @@ def makename():
         else:
             session['icon'] = '/static/HK3A`%S97J~6Y[X01QAT{YM.jpg'
         return redirect(url_for('join_room_url',room=room))
-    return render_template('makename.html',room=room)
+    return jsonify({'room': room})
 
 
 @app.route('/creatnewroom')
@@ -80,6 +80,7 @@ def creatnewroom():
 @app.route('/')
 def join_room_url():
     room = request.args.get('room')
+    print('hiahia')
     if not room:
         return "请输入带房间名的url加入房间,如?room=房间号,或通过访问/creatnewroom来创建一个属于你的新房间"
     if not query_room(room):
@@ -104,14 +105,14 @@ def join_room_url():
         }
     else:
         res = {
-            "data": []
+            "data": '666'
         }
     r=query_room(room)
-    return render_template('roomchat.html',room=room,name=name,resp=res,master=session['master'],
-                           async_mode=socketio.async_mode,r=r,icon=session['icon'])
+    return jsonify({'roomid': room,'roomname':r.name,'roomicon':r.image,'roomintroduction':r.introduction,
+                    'name':name,'resp':res,'master':session['master'],'icon':session['icon']})
 
 
-@app.route('/changeroom',methods=['GET','POST'])
+@app.route('/changeroom',methods=['POST'])
 def changeroom():
     room = request.args.get('room')
     r=query_room(room)
@@ -130,7 +131,6 @@ def changeroom():
             r.name=name
         db.session.commit()
         return redirect(url_for('join_room_url',room=room))
-    return render_template('changeroom.html')
 
 @socketio.on('join')
 def on_join():
@@ -227,8 +227,4 @@ def test_disconnect():
             emit('people_num', r.count,room=session['room'])
 
 if __name__ == '__main__':
-<<<<<<< HEAD
-    socketio.run(app)
-=======
-    socketio.run(app,log_output=True)
->>>>>>> more
+    socketio.run(app,debug=True,log_output=True)
