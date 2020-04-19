@@ -73,7 +73,7 @@ def creatnewroom():
         ro = Room(id=room, name='暂无', count=0, introduction='无', image=icon)
         db.session.add(ro)
         db.session.commit()
-        return redirect(url_for('join_room_url',room=room))
+        return redirect(url_for('changeroom',room=room))
     else:
         return redirect(url_for('creatnewroom'))
 
@@ -227,8 +227,4 @@ def test_disconnect():
             emit('people_num', r.count,room=session['room'])
 
 if __name__ == '__main__':
-<<<<<<< HEAD
-    socketio.run(app)
-=======
     socketio.run(app,log_output=True)
->>>>>>> more
