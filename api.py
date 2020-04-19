@@ -37,6 +37,7 @@ class Room(db.Model):
 db.drop_all()
 db.create_all()
 
+<<<<<<< HEAD
 @app.route('/name',methods=['POST'])
 def makename():
     room = request.args.get('room')
@@ -52,6 +53,33 @@ def makename():
     else:
         session['icon'] = '/static/HK3A`%S97J~6Y[X01QAT{YM.jpg'
     return jsonify({'name': name,'icon':session['icon']})
+=======
+@app.route('/name',methods=['GET','POST'])
+def makename():
+    room = request.args.get('room')
+    if request.method=='POST':
+        room = request.args.get('room')
+        name = request.json.get('name','')
+        session['icon'] = session.get('icon', '')
+        session['master'] = session.get('master', '')
+        session['room'] = session.get('room', '')
+        file = request.files.get('file')
+        path = r'.\static'
+        if(name == ''):
+            flash('匿名名称不能为空')
+            return  redirect(url_for('makename',room=room))
+        else:
+            session['name'] = name
+            session['room']=room
+        if file:
+            file.save(os.path.join(path, file.filename))
+            icon = '/static/' + file.filename
+            session['icon'] = icon
+        else:
+            session['icon'] = '/static/HK3A`%S97J~6Y[X01QAT{YM.jpg'
+        return redirect(url_for('join_room_url',room=room))
+    return jsonify({'room': room})
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
 
 
 @app.route('/creatnewroom')
@@ -63,13 +91,20 @@ def creatnewroom():
         ro = Room(id=room, name='暂无', count=0, introduction='无', image=icon)
         db.session.add(ro)
         db.session.commit()
+<<<<<<< HEAD
         return jsonify({'room': room})
     else:
         return jsonify({'room': ''})
+=======
+        return redirect(url_for('join_room_url',room=room))
+    else:
+        return redirect(url_for('creatnewroom'))
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
 
 @app.route('/')
 def join_room_url():
     room = request.args.get('room')
+<<<<<<< HEAD
     if not room:
         return "请输入带房间名的url加入房间,如?room=房间id,或通过访问/creatnewroom来创建一个属于你的新房间"
     if not query_room(room):
@@ -83,6 +118,25 @@ def join_room_url():
     else:
         name = ''
     session['room'] = room
+=======
+    print('hiahia')
+    if not room:
+        return "请输入带房间名的url加入房间,如?room=房间号,或通过访问/creatnewroom来创建一个属于你的新房间"
+    if not query_room(room):
+        abort(404)
+    try:
+        session['room']
+        session['name']
+        session['icon']
+    except:
+        return redirect(url_for('makename',room=room))
+    else:
+        if session['room'] == room:
+            name = session['name']
+            session['room'] = room
+        else:
+            return redirect(url_for('makename', room=room))
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
     key = room
     if rd.llen(key):
         msgs = rd.lrange(key, 0, -1)
@@ -91,10 +145,17 @@ def join_room_url():
         }
     else:
         res = {
+<<<<<<< HEAD
             "data": []
         }
     r=query_room(room)
     return jsonify({'room': room,'roomname':r.name,'roomicon':r.image,'roomintroduction':r.introduction,
+=======
+            "data": '666'
+        }
+    r=query_room(room)
+    return jsonify({'roomid': room,'roomname':r.name,'roomicon':r.image,'roomintroduction':r.introduction,
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
                     'name':name,'resp':res,'master':session['master'],'icon':session['icon']})
 
 
@@ -102,6 +163,7 @@ def join_room_url():
 def changeroom():
     room = request.args.get('room')
     r=query_room(room)
+<<<<<<< HEAD
     name=request.form.get('roomname')
     introduction=request.form.get('roomintroduction')
     file = request.files.get('file')
@@ -116,13 +178,34 @@ def changeroom():
         r.name=name
     db.session.commit()
     return jsonify({'roomname': name,'roomintroduction':introduction})
+=======
+    if request.method == 'POST':
+        name=request.form.get('room_name')
+        introduction=request.form.get('room_introduction')
+        file = request.files['file']
+        path=r'.\static'
+        if file:
+            file.save(os.path.join(path,file.filename))
+            icon = '/static/'+file.filename
+            r.image = icon
+        if introduction:
+            r.introduction=introduction
+        if name:
+            r.name=name
+        db.session.commit()
+        return redirect(url_for('join_room_url',room=room))
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
 
 @socketio.on('join')
 def on_join():
     room = session['room']
     join_room(room)
     key = session['room']
+<<<<<<< HEAD
     task = {'name' : '','icon' : '','data' : '欢迎"'+session['name']+'"进入了房间'}
+=======
+    task = {'data' : '欢迎"'+session['name']+'"进入了房间'}
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
     resp = json.dumps(task)
     rd.rpush(key,resp)
     r=query_room(room)
@@ -149,7 +232,11 @@ def leave():
         session['master'] = ''
     else:
         key = session['room']
+<<<<<<< HEAD
         task = {'name' : '','icon' : '','data': '用户"'+session['name'] + '"离开了房间'}
+=======
+        task = {'data': session['name'] + '"离开了房间'}
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
         resp = json.dumps(task)
         rd.rpush(key, resp)
         r = query_room(session['room'])
@@ -166,12 +253,19 @@ def room_chat(data):
     key = session['room']
     task = {
         'name' : session['name'],
+<<<<<<< HEAD
         'icon' : session['icon'],
+=======
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
         'data' : data['data']
     }
     resp = json.dumps(task)
     rd.rpush(key, resp)
+<<<<<<< HEAD
     emit('roomchat',{'data':data['data'],'name':session['name'],'icon':session['icon']},room=session['room'])
+=======
+    emit('roomchat',{'data':data['data'],'name':session['name']},room=session['room'])
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
 
 @socketio.on('changenamee')
 def change_name(data):
@@ -206,7 +300,11 @@ def test_disconnect():
             r.count-=1
             db.session.commit()
             key = session['room']
+<<<<<<< HEAD
             task = {'name' : '','icon' : '','data': '用户"'+session['name'] + '"离开了房间'}
+=======
+            task = {'data': session['name'] + '"离开了房间'}
+>>>>>>> 94d61fc4aefe91d32b92dce1e4ac530f1c3cb231
             resp = json.dumps(task)
             rd.rpush(key, resp)
             emit('leaveroom', {'name': session['name']}, room=session['room'])
