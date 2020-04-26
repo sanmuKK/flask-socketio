@@ -7,11 +7,16 @@ from flask_sqlalchemy import SQLAlchemy
 import pymysql
 pymysql.install_as_MySQLdb()
 
+ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
 
 def query_room(roomname):
     room = Room.query.filter(Room.id == roomname).first()
     if room:
         return room
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -39,39 +44,59 @@ db.create_all()
 
 @app.route('/name',methods=['POST'])
 def makename():
-    room = request.args.get('room')
+    session['room'] = session.get('room','')
     name = request.form.get('name','')
     session['name'] = name
-    session['room']=room
     file = request.files.get('file')
-    path = r'.\static'
-    if file:
+    path = r'./static'
+    if not allowed_file(file.filename):
+        session['icon'] = ''
+    elif file:
         file.save(os.path.join(path, file.filename))
         icon = '/static/' + file.filename
         session['icon'] = icon
     else:
         session['icon'] = '/static/HK3A`%S97J~6Y[X01QAT{YM.jpg'
-    return jsonify({'name': name,'icon':session['icon']})
+    return jsonify({'name': name,'icon':session['icon'],'room':session['room']})
 
 
-@app.route('/creatnewroom')
+@app.route('/userinformation')
+def userinformation():
+    session['name']=session.get('name','')
+    session['room'] = session.get('room', '')
+    session['master'] = session.get('master', '')
+    session['icon'] = session.get('icon','')
+    return jsonify({'name': session['name'],'room':session['room'],'master':session['master'],
+                    'icon':session['icon']})
+
+
+@app.route('/creatnewroom',methods=['POST'])
 def creatnewroom():
-    icon = '/static/56172956.jpeg'
     room=uuid.uuid4().hex
     if not query_room(room):
         session['master'] = room
-        ro = Room(id=room, name='暂无', count=0, introduction='无', image=icon)
+        session['room'] = room
+        name = request.form.get('roomname','')
+        introduction = request.form.get('roomintroduction','')
+        file = request.files.get('file')
+        path = r'./static'
+        if not allowed_file(file.filename):
+            icon = ''
+        elif file:
+            file.save(os.path.join(path, file.filename))
+            icon = '/static/' + file.filename
+        ro = Room(id=room, name=name, count=0, introduction=introduction, image=icon)
         db.session.add(ro)
         db.session.commit()
-        return jsonify({'room': room})
+        return jsonify({'room': room,'roomname': name, 'roomintroduction': introduction, 'icon': icon})
     else:
-        return jsonify({'room': ''})
+        return jsonify({'room': '','roomname': '', 'roomintroduction': '', 'icon': ''})
 
 @app.route('/')
 def join_room_url():
     room = request.args.get('room')
     if not room:
-        return "请输入带房间名的url加入房间,如?room=房间id,或通过访问/creatnewroom来创建一个属于你的新房间"
+        return "请输入带房间名的url加入房间,如?room=房间id,或通过post访问/creatnewroom来创建一个属于你的新房间"
     if not query_room(room):
         abort(404)
     session['room']=session.get('room','')
@@ -105,8 +130,10 @@ def changeroom():
     name=request.form.get('roomname')
     introduction=request.form.get('roomintroduction')
     file = request.files.get('file')
-    path=r'.\static'
-    if file:
+    path=r'./static'
+    if not allowed_file(file.filename):
+        icon = ''
+    elif file:
         file.save(os.path.join(path,file.filename))
         icon = '/static/'+file.filename
         r.image = icon
@@ -115,7 +142,7 @@ def changeroom():
     if name:
         r.name=name
     db.session.commit()
-    return jsonify({'roomname': name,'roomintroduction':introduction})
+    return jsonify({'roomname': name,'roomintroduction':introduction,'icon':icon})
 
 @socketio.on('join')
 def on_join():
@@ -213,4 +240,4 @@ def test_disconnect():
             emit('people_num', r.count,room=session['room'])
 
 if __name__ == '__main__':
-    socketio.run(app,debug=True,log_output=True)
+    socketio.run(app)

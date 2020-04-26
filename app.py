@@ -8,10 +8,16 @@ import pymysql
 pymysql.install_as_MySQLdb()
 
 
+ALLOWED_EXTENSIONS = set(['txt', 'pdf', 'png', 'jpg', 'jpeg', 'gif'])
+
 def query_room(roomname):
     room = Room.query.filter(Room.id == roomname).first()
     if room:
         return room
+
+def allowed_file(filename):
+    return '.' in filename and \
+           filename.rsplit('.', 1)[1] in ALLOWED_EXTENSIONS
 
 app = Flask(__name__)
 app.config['SECRET_KEY'] = 'secret!'
@@ -47,7 +53,7 @@ def makename():
         session['master'] = session.get('master', '')
         session['room'] = session.get('room', '')
         file = request.files.get('file')
-        path = r'.\static'
+        path = r'./static'
         if(name == ''):
             flash('匿名名称不能为空')
             return  redirect(url_for('makename',room=room))
@@ -55,6 +61,9 @@ def makename():
             session['name'] = name
             session['room']=room
         if file:
+            if not allowed_file(file.filename):
+                flash('你上传了不符合格式的图片')
+                return redirect(url_for('makename', room=room))
             file.save(os.path.join(path, file.filename))
             icon = '/static/' + file.filename
             session['icon'] = icon
@@ -119,8 +128,11 @@ def changeroom():
         name=request.form.get('room_name')
         introduction=request.form.get('room_introduction')
         file = request.files['file']
-        path=r'.\static'
+        path=r'./static'
         if file:
+            if not allowed_file(file.filename):
+                flash('你上传了不符合格式的图片')
+                return redirect(url_for('changeroom', room=room))
             file.save(os.path.join(path,file.filename))
             icon = '/static/'+file.filename
             r.image = icon
@@ -227,4 +239,4 @@ def test_disconnect():
             emit('people_num', r.count,room=session['room'])
 
 if __name__ == '__main__':
-    socketio.run(app,log_output=True)
+    socketio.run(app)

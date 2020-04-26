@@ -13,4 +13,7 @@
 		<input type = "file" name = file size="100px">
 		<input type = "submit" value = 保存>
 	</form>
+	{% for i in get_flashed_messages() %}
+        <p>{{ i }}</p>
+    {% endfor %}
 </h1></div></body>
