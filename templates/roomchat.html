@@ -8,8 +8,7 @@
     <script type="text/javascript" charset="utf-8">
     $(document).ready(function() {
         var socket = io();
-        socket.on('connect', function() {
-            });
+
         socket.on('roomchat', function (msg, cb) {
             $('#log').append('<br>' + $('<div/>').text( msg.name+': ' + msg.data).html());
             if (cb)

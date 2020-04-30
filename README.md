@@ -9,7 +9,7 @@
    3.  密码自己设定（自己记住）
 
     4.  通过ssh工具登录服务器
-        1. 这里推荐使用Putty进行登录。（可以自己百度下载一个，putty开源） 注意要开放ssh连接的端口，一般默认是22，（重装系统是默认开启的）为了网站安全推荐更换ssh登录端口。设置为不常用的端口。
+        1. 这里推荐大家使用Putty进行登录。（可以自己百度下载一个，putty开源） 注意要开放ssh连接的端口，一般默认是22，（重装系统是默认开启的）为了网站安全推荐大家更换ssh登录端口。设置为不常用的端口。
 2. putty登录服务器方法。只需要设置好IP地址，端口号，选择SSH。再点击open即可连接服务器（第一次连接会出来一个安全信息，后面就不会再有，点确定就好了）
 3. 输入账号密码（账号就是root，密码是安装系统的时候）登录。（lunix下输入密码是没有光标提示操作的，直接输入完了直接回车）
 
@@ -59,7 +59,7 @@ ln -s /usr/local/python3/bin/pip3 /usr/bin/pip3
 
 * 创建虚拟环境
 * 安装flask
-* 安装和配置uwsgi
+* 安装和配置gunicorn
 * 配置nginx
 
 ```
@@ -74,35 +74,22 @@ source .env/bin/activate
 deactivate  
 ```
 
-* 在test文件夹把代码放入test.py（例如下面）
-
-```
-from flask import Flask
-
-app = Flask(__name__)
-
-@app.route("/")
-def helloWorld():
-    return "Hello World"
-
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8787, debug=True)
-```
-
+* 在test文件夹把代码放入test.py
 * 安装gunicorn
 
-1. 安装gunicorn（进入虚拟环境安装）
+1. 安装gunicorn（进入虚拟环境安装source .env/bin/activate）
 
 ```
 pip3 install gunicorn
 ```
 
-2.启动gunicorn（进入虚拟环境启动）
+2.启动gunicorn（进入虚拟环境启动source .env/bin/activate）
 
 ```
-gunicorn --worker-class eventlet -b 0.0.0.0:8787 -D test:app（在www.test.com文件夹下的虚拟文件夹启动）
+gunicorn -b 127.0.0.1:8787 -k eventlet -w 1 -D test3:app
 pstree -ap|grep gunicorn（获取gunicorn进程树，在www.test.com文件夹下的虚拟文件夹使用，其中主进程也就是第一个就是下面要kill的）
 kill -HUP ****（重启gunicorn，在www.test.com文件夹下的虚拟文件夹使用，****是gunicorn主进程,通过获取进程树查看）
+kill -15 ****(kill进程)
 ```
 
 
@@ -111,12 +98,16 @@ kill -HUP ****（重启gunicorn，在www.test.com文件夹下的虚拟文件夹�
 * 配置nginx(加入宝塔对应域名的配置文件中并注释 include enable-php-56.conf;)
 
 ```
-location / {
+    location / {
+        root /www/wwwroot/www.test.com/static/dist/;
+        index  index.html index.htm;
+    }
+    location /api {
         proxy_pass http://127.0.0.1:8787;
         proxy_set_header Host $host;
         proxy_set_header X-Forwarded-For 		$proxy_add_x_forwarded_for;
-}
- location /socket.io {
+    }
+    location /socket.io {
         proxy_pass http://127.0.0.1:8787/socket.io;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
@@ -125,10 +116,8 @@ location / {
         proxy_set_header Upgrade $http_upgrade;
         proxy_set_header Connection "Upgrade";
     }
-    add_header 'Access-Control-Allow-Origin' *;
-    add_header 'Access-Control-Allow-Credentials' 'true';
-    add_header 'Access-Control-Allow-Methods' 'GET, POST, OPTIONS';
-    add_header 'Access-Control-Allow-Headers' 'DNT,X-Mx-ReqToken,Keep-Alive,User-Agent,X-Requested-With,
-If-Modified-Since,Cache-Control,Content-Type';
+    location /static {
+        alias /www/wwwroot/www.test.com/static;
+    }
 ```
 

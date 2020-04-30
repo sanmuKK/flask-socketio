@@ -69,7 +69,7 @@ def makename():
             session['icon'] = icon
         else:
             session['icon'] = '/static/HK3A`%S97J~6Y[X01QAT{YM.jpg'
-        return redirect(url_for('join_room_url',room=room))
+        return redirect(url_for('join_room_urll',room=room))
     return render_template('makename.html',room=room)
 
 
@@ -87,7 +87,7 @@ def creatnewroom():
         return redirect(url_for('creatnewroom'))
 
 @app.route('/')
-def join_room_url():
+def join_room_urll():
     room = request.args.get('room')
     if not room:
         return "请输入带房间名的url加入房间,如?room=房间号,或通过访问/creatnewroom来创建一个属于你的新房间"
@@ -141,7 +141,7 @@ def changeroom():
         if name:
             r.name=name
         db.session.commit()
-        return redirect(url_for('join_room_url',room=room))
+        return redirect(url_for('join_room_urll',room=room))
     return render_template('changeroom.html')
 
 @socketio.on('join')
@@ -239,4 +239,4 @@ def test_disconnect():
             emit('people_num', r.count,room=session['room'])
 
 if __name__ == '__main__':
-    socketio.run(app)
+    socketio.run(app,log_output=True)
