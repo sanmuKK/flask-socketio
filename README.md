@@ -1,5 +1,9 @@
 ## flask+gunicorn+nginx
-## API文档地址是https://www.showdoc.cc/ljlsanmu
+
+API地址：www.showdoc.cc/ljlsanmu
+
+聊天室地址：47.107.243.207
+
 ## 服务器
 
  ####  安装centos7系统
@@ -86,7 +90,7 @@ pip3 install gunicorn
 2.启动gunicorn（进入虚拟环境启动source .env/bin/activate）
 
 ```
-gunicorn -b 127.0.0.1:8787 -k eventlet -w 1 -D test3:app
+gunicorn -b 127.0.0.1:8787 -k eventlet -w 1 -D test:app
 pstree -ap|grep gunicorn（获取gunicorn进程树，在www.test.com文件夹下的虚拟文件夹使用，其中主进程也就是第一个就是下面要kill的）
 kill -HUP ****（重启gunicorn，在www.test.com文件夹下的虚拟文件夹使用，****是gunicorn主进程,通过获取进程树查看）
 kill -15 ****(kill进程)

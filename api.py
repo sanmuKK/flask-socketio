@@ -69,6 +69,9 @@ def makename():
 def creatnewroom():
     room=uuid.uuid4().hex
     if not query_room(room):
+        session['room'] = session.get('room',room)
+        session[session['room']] = session.get(session['room'],0)
+        session[session['room']] = 0
         session['room'] = room
         name = request.form.get('roomname','')
         introduction = request.form.get('roomintroduction','')
@@ -97,7 +100,9 @@ def join_room_url():
         return jsonify({'error': 'noroom'})
     if not query_room(room):
         abort(404)
-    session['room']=session.get('room','')
+    session['room'] = session.get('room','')
+    if room != session['room']:
+        session[session['room']] = 0
     session['name']=session.get('name','')
     session['icon']=session.get('icon','')
     session['room'] = room
@@ -118,7 +123,9 @@ def join_room_url():
         session['master'] = room
     else:
         session['master'] = ''
-    return jsonify({'room': room,'roomname':r.name,'roomicon':r.image,'roomintroduction':r.introduction,
+    session[session['room']]=session.get(session['room'],0)
+    session[session['room']] += 1
+    return jsonify({'count':session[session['room']],'room': room,'roomname':r.name,'roomicon':r.image,'roomintroduction':r.introduction,
                     'name':session['name'],'resp':res,'master':session['master'],'icon':session['icon'],
                     'ip':ip,'browser':browser})
 
@@ -127,35 +134,47 @@ def join_room_url():
 def changeroom():
     room = request.args.get('room')
     r=query_room(room)
-    name=request.form.get('roomname','')
-    introduction=request.form.get('roomintroduction','')
-    file = request.files.get('file','')
+    name=request.form.get('roomname')
+    introduction=request.form.get('roomintroduction')
+    file = request.files.get('file')
     session['icon'] = session.get("icon",'')
+    icon = session['icon']
     path=r'./static'
-    if not file:
-        icon = session['icon']
-    if not allowed_file(file.filename):
-        icon = ''
-    else:
-        file.save(os.path.join(path,file.filename))
-        icon = '/static/'+file.filename
-        r.image = icon
-    if introduction:
-        r.introduction=introduction
-    if name:
-        r.name=name
-    db.session.commit()
+    if r:
+        if not file:
+            icon = session['icon']
+        elif not allowed_file(file.filename):
+            icon = session['icon']
+        else:
+            file.save(os.path.join(path,file.filename))
+            icon = '/static/'+file.filename
+            r.image = icon
+        if introduction:
+            r.introduction=introduction
+        if name:
+            r.name=name
+        db.session.commit()
     return jsonify({'roomname': name,'roomintroduction':introduction,'icon':icon})
 
 @socketio.on('join')
 def on_join(data):
-    room = data['room']
-    join_room(room)
-    r=query_room(room)
-    r.count+=1
-    db.session.commit()
-    emit('people_num',r.count,room=room)
-    emit('welcome', {'name': session['name']}, room=room)
+    session[data['room']] = session.get(data['room'],0)
+    session['name'] = session.get('name','')
+    session['room'] = session.get('room', '')
+    session['current_room'] = data['room']
+    if session['name'] != '' and session[data['room']] != 1:
+        room = data['room']
+        join_room(room)
+        r=query_room(room)
+        r.count+=1
+        db.session.commit()
+        emit('people_num',r.count,room=room)
+        emit('welcome', {'name': session['name']}, room=room)
+    elif session['name'] != '':
+        room = data['room']
+        join_room(room)
+        r = query_room(room)
+        emit('people_num', r.count, room=room)
 
 
 @socketio.on('my_room_event')
@@ -190,13 +209,14 @@ def close(data):
 
 @socketio.on('disconnect')
 def test_disconnect():
-    room = session['room']
-    r=query_room(room)
-    if r:
-        r.count-=1
-        db.session.commit()
-        emit('leaveroom', {'name': session['name']}, room=room)
-        emit('people_num', r.count,room=room)
+    if session['name'] != '' and session['room'] == session['current_room']:
+        room = session['room']
+        r=query_room(room)
+        if r:
+            r.count-=1
+            db.session.commit()
+            emit('leaveroom', {'name': session['name']}, room=room)
+            emit('people_num', r.count,room=room)
 
 if __name__ == '__main__':
     socketio.run(app,log_output=True,debug=True)
