@@ -160,7 +160,7 @@ def changeroom():
 def on_join(data):
     session[data['room']] = session.get(data['room'],0)
     session['name'] = session.get('name','')
-    session['room'] = session.get('room', '')
+    session['room'] = data['room']
     session['current_room'] = data['room']
     if session['name'] != '' and session[data['room']] != 1:
         room = data['room']
